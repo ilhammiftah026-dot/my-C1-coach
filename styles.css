@@ -241,3 +241,9 @@ input[type="range"]{width:100%}
   color:rgba(12,18,32,.55);
   font-weight:700;
 }
+.exercise{
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+}
