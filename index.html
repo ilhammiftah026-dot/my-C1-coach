@@ -2,200 +2,256 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>My C1 Coach (Institut Français)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My C1 Coach</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="header">
+  <header class="topbar">
     <div class="brand">
-      <div class="logo">🇫🇷</div>
+      <div class="flag">🇫🇷</div>
       <div>
-        <h1>My C1 Coach</h1>
-        <p class="subtitle">Test perso → niveau estimé → plan 6 mois → séance du jour</p>
+        <div class="title">My C1 Coach</div>
+        <div class="subtitle">Test perso → niveau estimé → plan 6 mois → séance du jour</div>
       </div>
     </div>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="home">Accueil</button>
-      <button class="tab" data-tab="test">Diagnostic</button>
-      <button class="tab" data-tab="results">Résultats</button>
-      <button class="tab" data-tab="plan">Plan 6 mois</button>
-      <button class="tab" data-tab="daily">Coach du jour</button>
-      <button class="tab" data-tab="settings">Réglages</button>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-screen="home">Accueil</button>
+      <button class="tab" data-screen="diag">Diagnostic</button>
+      <button class="tab" data-screen="results">Résultats</button>
+      <button class="tab" data-screen="plan">Plan 6 mois</button>
+      <button class="tab" data-screen="daily">Coach du jour</button>
+      <button class="tab" data-screen="settings">Réglages</button>
     </nav>
   </header>
 
-  <main class="main">
+  <main class="container">
     <!-- HOME -->
-    <section id="home" class="panel show">
-      <div class="card">
+    <section class="screen show" id="screen-home">
+      <div class="card hero">
         <h2>Bienvenue 👋</h2>
         <p>
-          Ce site te sert à te préparer au <b>test de positionnement de l’Institut Français</b>
-          et à progresser vers <b>C1</b> sur 6 mois, avec un planning adaptatif selon ton énergie.
+          Fais ton diagnostic, récupère un niveau estimé, puis génère ton plan sur 6 mois.
+          Chaque jour, ton coach te donne une séance claire (30–45 min semaine, 2h week-end).
         </p>
-        <div class="grid2">
-          <div class="mini">
-            <h3>1) Fais le diagnostic</h3>
-            <p>Compréhension écrite + grammaire (auto-corrigé).<br/>Expression écrite/orale (auto-évaluation).</p>
+        <div class="row">
+          <button class="btn primary" id="goDiag">Commencer le diagnostic</button>
+          <button class="btn" id="goDaily">Voir le coach du jour</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>📌 Ton niveau actuel</h3>
+          <p id="homeLevel" class="big">—</p>
+          <p class="muted">Basé sur ton dernier diagnostic.</p>
+        </div>
+
+        <div class="card">
+          <h3>🔥 Streak</h3>
+          <p id="homeStreak" class="big">0</p>
+          <p class="muted">Nombre de jours avec séance validée.</p>
+        </div>
+
+        <div class="card">
+          <h3>⏱ Temps / jour</h3>
+          <p id="homeTime" class="big">30 min</p>
+          <p class="muted">Modifiable dans Réglages.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DIAGNOSTIC -->
+    <section class="screen" id="screen-diag">
+      <div class="card">
+        <h2>Diagnostic (rapide)</h2>
+        <p class="muted">Réponds honnêtement. C’est pour adapter ton plan.</p>
+
+        <div class="diag-grid">
+          <div class="diag-block">
+            <h3>📖 Compréhension écrite (0–10)</h3>
+            <input id="scoreRead" type="number" min="0" max="10" value="5" />
+            <p class="muted">0 = très difficile, 10 = facile.</p>
           </div>
-          <div class="mini">
-            <h3>2) Reçois ton plan</h3>
-            <p>Plan sur 6 mois basé sur tes faiblesses (B2 → C1).</p>
+
+          <div class="diag-block">
+            <h3>🧠 Grammaire (0–10)</h3>
+            <input id="scoreGram" type="number" min="0" max="10" value="4" />
+            <p class="muted">Accords, temps, subjonctif, pronoms…</p>
+          </div>
+
+          <div class="diag-block">
+            <h3>✍️ Écrit (0–4)</h3>
+            <input id="scoreWrite" type="number" min="0" max="4" value="1" />
+            <p class="muted">Produire un texte structuré.</p>
+          </div>
+
+          <div class="diag-block">
+            <h3>🎧 Oral (0–4)</h3>
+            <input id="scoreListen" type="number" min="0" max="4" value="0" />
+            <p class="muted">Comprendre + répondre à l’oral.</p>
           </div>
         </div>
 
         <div class="row">
-          <button id="goTest" class="primary">Commencer le diagnostic</button>
-          <button id="resetAll" class="danger">Réinitialiser</button>
+          <button class="btn primary" id="runDiag">Calculer mon niveau</button>
+          <button class="btn" id="resetDiag">Réinitialiser</button>
         </div>
-        <p class="small">Tout est sauvegardé localement dans ton navigateur (pas de compte).</p>
       </div>
-    </section>
 
-    <!-- TEST -->
-    <section id="test" class="panel">
       <div class="card">
-        <h2>Diagnostic (Institut Français – style placement)</h2>
-        <p class="small">Temps conseillé : 25–35 minutes.</p>
-
-        <div class="row wrap">
-          <button id="startTest" class="primary">Démarrer</button>
-          <button id="saveTest" class="secondary">Sauvegarder</button>
-          <button id="finishTest" class="primary">Terminer & analyser</button>
-        </div>
-
-        <hr/>
-
-        <h3>A) Compréhension écrite (10 Q)</h3>
-        <div id="readingBlock" class="qblock"></div>
-
-        <h3>B) Grammaire & lexique (10 Q)</h3>
-        <div id="grammarBlock" class="qblock"></div>
-
-        <h3>C) Expression écrite (auto-évaluation)</h3>
-        <p class="small">Écris 180–220 mots. Ensuite, coche ta grille (structure, connecteurs, correction).</p>
-        <textarea id="writingText" rows="8" placeholder="Écris ici... (180–220 mots)"></textarea>
-        <div class="checks">
-          <label><input type="checkbox" id="w_structure"> Structure claire (intro/dév/débat/conclusion)</label>
-          <label><input type="checkbox" id="w_connectors"> Connecteurs variés (cependant, en revanche, certes...)</label>
-          <label><input type="checkbox" id="w_precision"> Vocabulaire précis (évite ‘très’, ‘chose’, ‘bien’)</label>
-          <label><input type="checkbox" id="w_grammar"> Peu d’erreurs gênantes</label>
-        </div>
-
-        <h3>D) Expression orale (auto-évaluation)</h3>
-        <p class="small">Réponds 2–3 min à l’oral (tu peux t’enregistrer avec ton téléphone). Puis coche.</p>
-        <div class="mini card2">
-          <p><b>Sujet (C1) :</b> “Faut-il limiter l’usage des réseaux sociaux pour protéger la santé mentale ?”</p>
-          <p class="small">Donne une thèse, un contre-argument, un exemple, une conclusion.</p>
-        </div>
-        <div class="checks">
-          <label><input type="checkbox" id="s_fluency"> Je parle avec fluidité (peu de blocages)</label>
-          <label><input type="checkbox" id="s_structure"> Mon discours est structuré (plans, transitions)</label>
-          <label><input type="checkbox" id="s_pron"> Prononciation compréhensible</label>
-          <label><input type="checkbox" id="s_range"> Vocabulaire varié + reformulation</label>
-        </div>
+        <h3>Conseil</h3>
+        <p class="muted">
+          Si tu comprends l’économie mais pas le vocabulaire “difficile”, ton besoin principal est :
+          <b>lexique + reformulation + connecteurs + grammaire utile</b>.
+        </p>
       </div>
     </section>
 
     <!-- RESULTS -->
-    <section id="results" class="panel">
+    <section class="screen" id="screen-results">
       <div class="card">
         <h2>Résultats & niveau estimé</h2>
-        <div id="resultSummary" class="summary"></div>
+        <div class="pill-row">
+          <div class="pill">
+            <div class="pillLabel">Niveau estimé</div>
+            <div class="pillValue" id="levelEstimated">—</div>
+          </div>
+          <div class="pill">
+            <div class="pillLabel">Détails</div>
+            <div class="pillValue" id="scoreDetails">—</div>
+          </div>
+        </div>
 
         <div class="grid2">
-          <div class="mini">
+          <div class="card soft">
             <h3>Forces</h3>
             <ul id="strengths"></ul>
           </div>
-          <div class="mini">
+
+          <div class="card soft">
             <h3>Priorités (C1)</h3>
             <ul id="priorities"></ul>
           </div>
         </div>
 
-        <div class="row wrap">
-          <button id="buildPlan" class="primary">Générer mon plan 6 mois</button>
-          <button id="goDaily" class="secondary">Voir “Coach du jour”</button>
+        <div class="row">
+          <button class="btn primary" id="genPlanBtn">Générer mon plan 6 mois</button>
+          <button class="btn" id="goDailyFromRes">Voir “Coach du jour”</button>
         </div>
       </div>
     </section>
 
     <!-- PLAN -->
-    <section id="plan" class="panel">
+    <section class="screen" id="screen-plan">
       <div class="card">
-        <h2>Plan 6 mois (personnalisé)</h2>
-        <div id="planBox" class="planbox small"></div>
+        <h2>Plan 6 mois</h2>
+        <p class="muted">
+          Généré selon ton niveau + ton temps disponible. Tu peux régénérer après un nouveau diagnostic.
+        </p>
+        <div id="planBox" class="plan"></div>
+
+        <div class="row">
+          <button class="btn primary" id="regenPlan">Regénérer</button>
+          <button class="btn" id="exportBtn">Exporter mes données</button>
+          <label class="btn fileBtn">
+            Importer <input type="file" id="importFile" accept="application/json" hidden />
+          </label>
+        </div>
       </div>
     </section>
 
     <!-- DAILY -->
-    <section id="daily" class="panel">
+    <section class="screen" id="screen-daily">
       <div class="card">
-        <h2>Coach du jour</h2>
-        <p class="small">Choisis ton énergie et je te donne ta séance.</p>
-
-        <div class="row wrap">
-          <button class="energy" data-energy="15">💤 Fatiguée (15 min)</button>
-          <button class="energy" data-energy="30">🙂 Normale (30 min)</button>
-          <button class="energy" data-energy="60">🔥 Motivé(e) (60 min)</button>
+        <div class="daily-head">
+          <h2>Coach du jour</h2>
+          <div class="badge" id="dailyBadge">—</div>
         </div>
 
-        <div id="dailyBox" class="dailybox"></div>
+        <div class="grid2">
+          <div class="card soft">
+            <h3>⏱ Durée</h3>
+            <p class="big" id="dailyDuration">—</p>
+            <p class="muted" id="dailyHint">—</p>
+          </div>
+          <div class="card soft">
+            <h3>🎯 Focus</h3>
+            <p class="big" id="dailyFocus">—</p>
+            <p class="muted">Basé sur tes priorités + ton niveau.</p>
+          </div>
+        </div>
+
+        <div class="card soft">
+          <h3>✅ Ta séance</h3>
+          <ol id="dailyTasks"></ol>
+          <div class="row">
+            <button class="btn primary" id="markDone">J’ai terminé</button>
+            <button class="btn" id="newDaily">Re-générer aujourd’hui</button>
+          </div>
+          <p class="muted" id="doneMsg"></p>
+        </div>
+
+        <div class="card">
+          <h3>🔗 Tes ressources</h3>
+          <div id="linksBox" class="links"></div>
+          <p class="muted">Tu peux modifier tes liens dans Réglages.</p>
+        </div>
       </div>
     </section>
 
     <!-- SETTINGS -->
-    <section id="settings" class="panel">
+    <section class="screen" id="screen-settings">
       <div class="card">
         <h2>Réglages</h2>
 
         <div class="grid2">
-          <div class="mini">
+          <div class="card soft">
             <h3>Objectif</h3>
-            <label class="field">
-              Date cible (approx.)
-              <input id="targetDate" type="date" />
-            </label>
-            <label class="field">
-              Temps moyen / jour
-              <select id="dailyTime">
-                <option value="15">15 min</option>
-                <option value="30" selected>30 min</option>
-                <option value="45">45 min</option>
-                <option value="60">60 min</option>
-              </select>
-            </label>
-          </div>
 
-          <div class="mini">
-            <h3>Ressources (liens)</h3>
-            <p class="small">
-              Tu peux mettre tes liens préférés (TV5Monde / RFI / Institut Français).
+            <label class="label">Date cible (approx.)</label>
+            <input type="date" id="targetDate" />
+
+            <label class="label">Temps moyen / jour</label>
+            <select id="dailyTime">
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60">60 min</option>
+            </select>
+
+            <p class="muted">
+              Week-end : on applique automatiquement une version “2h”.
             </p>
-            <label class="field">Lien 1 <input id="link1" placeholder="ex: https://..." /></label>
-            <label class="field">Lien 2 <input id="link2" placeholder="ex: https://..." /></label>
-            <label class="field">Lien 3 <input id="link3" placeholder="ex: https://..." /></label>
+          </div>
+
+          <div class="card soft">
+            <h3>Ressources (liens)</h3>
+
+            <label class="label">Lien 1</label>
+            <input id="link1" placeholder="ex: https://..." />
+
+            <label class="label">Lien 2</label>
+            <input id="link2" placeholder="ex: https://..." />
+
+            <label class="label">Lien 3</label>
+            <input id="link3" placeholder="ex: https://..." />
           </div>
         </div>
 
-        <div class="row wrap">
-          <button id="saveSettings" class="primary">Enregistrer</button>
-          <button id="exportData" class="secondary">Exporter mes données</button>
-          <label class="importBtn">
-            Importer
-            <input id="importData" type="file" accept="application/json" hidden />
-          </label>
+        <div class="row">
+          <button class="btn primary" id="saveSettings">Enregistrer</button>
+          <button class="btn danger" id="hardReset">Tout réinitialiser</button>
         </div>
 
-        <p class="small">Export/Import te permet de garder tes données si tu changes de téléphone/PC.</p>
+        <p class="muted">
+          Export/Import te permet de garder tes données si tu changes de téléphone/PC.
+        </p>
       </div>
     </section>
   </main>
 
-  <footer class="footer small">
+  <footer class="footer">
     My C1 Coach • Perso • Offline-friendly (LocalStorage)
   </footer>
 
