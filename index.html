@@ -4,247 +4,361 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>My C1 Coach</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="description" content="Diagnostic + plan 6 mois + coach du jour (offline friendly)." />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
+
 <body>
   <header class="topbar">
     <div class="brand">
-      <div class="flag">🇫🇷</div>
+      <div class="flag" aria-hidden="true">🇫🇷</div>
       <div>
-        <div class="title">My C1 Coach</div>
-        <div class="subtitle">Test perso → niveau estimé → plan 6 mois → séance du jour</div>
+        <div class="brand-title">My C1 Coach</div>
+        <div class="brand-subtitle">Test perso → niveau estimé → plan 6 mois → séance du jour</div>
       </div>
     </div>
 
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-screen="home">Accueil</button>
-      <button class="tab" data-screen="diag">Diagnostic</button>
-      <button class="tab" data-screen="results">Résultats</button>
-      <button class="tab" data-screen="plan">Plan 6 mois</button>
-      <button class="tab" data-screen="daily">Coach du jour</button>
-      <button class="tab" data-screen="settings">Réglages</button>
+    <nav class="tabs" aria-label="Navigation">
+      <button class="tab active" data-route="home">Accueil</button>
+      <button class="tab" data-route="diagnostic">Diagnostic</button>
+      <button class="tab" data-route="results">Résultats</button>
+      <button class="tab" data-route="plan">Plan 6 mois</button>
+      <button class="tab" data-route="coach">Coach du jour</button>
+      <button class="tab" data-route="settings">Réglages</button>
     </nav>
   </header>
 
   <main class="container">
     <!-- HOME -->
-    <section class="screen show" id="screen-home">
-      <div class="card hero">
-        <h2>Bienvenue 👋</h2>
-        <p>
-          Fais ton diagnostic, récupère un niveau estimé, puis génère ton plan sur 6 mois.
-          Chaque jour, ton coach te donne une séance claire (30–45 min semaine, 2h week-end).
-        </p>
-        <div class="row">
-          <button class="btn primary" id="goDiag">Commencer le diagnostic</button>
-          <button class="btn" id="goDaily">Voir le coach du jour</button>
+    <section class="page active" id="page-home">
+      <div class="hero card">
+        <div class="hero-text">
+          <h1>Bienvenue 👋</h1>
+          <p>
+            Fais ton diagnostic, récupère un niveau estimé, puis génère ton plan sur 6 mois.
+            Chaque jour, ton coach te donne une séance claire adaptée à ton temps.
+          </p>
+          <div class="row">
+            <button class="btn primary" id="go-diagnostic">Commencer le diagnostic</button>
+            <button class="btn" id="go-coach">Voir le coach du jour</button>
+          </div>
+        </div>
+        <div class="hero-badges">
+          <div class="badge">
+            <div class="badge-title">Ton niveau actuel</div>
+            <div class="badge-value" id="home-level">—</div>
+            <div class="badge-muted">Basé sur ton dernier diagnostic.</div>
+          </div>
+          <div class="badge">
+            <div class="badge-title">🔥 Streak</div>
+            <div class="badge-value" id="home-streak">0</div>
+            <div class="badge-muted">Jours avec séance validée.</div>
+          </div>
+          <div class="badge">
+            <div class="badge-title">⏱ Temps / jour</div>
+            <div class="badge-value" id="home-daily">30 min</div>
+            <div class="badge-muted">Modifiable dans Réglages.</div>
+          </div>
         </div>
       </div>
 
-      <div class="grid">
+      <div class="grid-2">
         <div class="card">
-          <h3>📌 Ton niveau actuel</h3>
-          <p id="homeLevel" class="big">—</p>
-          <p class="muted">Basé sur ton dernier diagnostic.</p>
+          <h2>Objectif</h2>
+          <p class="muted" id="home-goal"></p>
+          <ul class="list" id="home-priorities"></ul>
         </div>
 
         <div class="card">
-          <h3>🔥 Streak</h3>
-          <p id="homeStreak" class="big">0</p>
-          <p class="muted">Nombre de jours avec séance validée.</p>
-        </div>
-
-        <div class="card">
-          <h3>⏱ Temps / jour</h3>
-          <p id="homeTime" class="big">30 min</p>
-          <p class="muted">Modifiable dans Réglages.</p>
+          <h2>Ce que tu vas améliorer</h2>
+          <div class="pill-row">
+            <span class="pill">Compréhension orale</span>
+            <span class="pill">Compréhension écrite</span>
+            <span class="pill">Expression orale</span>
+            <span class="pill">Expression écrite</span>
+            <span class="pill">Grammaire</span>
+            <span class="pill">Vocabulaire</span>
+          </div>
+          <p class="muted" style="margin-top:12px">
+            Ton plan s’adapte à ton temps: minimum 30 min/jour + 2h le week-end.
+          </p>
         </div>
       </div>
     </section>
 
     <!-- DIAGNOSTIC -->
-    <section class="screen" id="screen-diag">
+    <section class="page" id="page-diagnostic">
       <div class="card">
-        <h2>Diagnostic (rapide)</h2>
-        <p class="muted">Réponds honnêtement. C’est pour adapter ton plan.</p>
-
-        <div class="diag-grid">
-          <div class="diag-block">
-            <h3>📖 Compréhension écrite (0–10)</h3>
-            <input id="scoreRead" type="number" min="0" max="10" value="5" />
-            <p class="muted">0 = très difficile, 10 = facile.</p>
-          </div>
-
-          <div class="diag-block">
-            <h3>🧠 Grammaire (0–10)</h3>
-            <input id="scoreGram" type="number" min="0" max="10" value="4" />
-            <p class="muted">Accords, temps, subjonctif, pronoms…</p>
-          </div>
-
-          <div class="diag-block">
-            <h3>✍️ Écrit (0–4)</h3>
-            <input id="scoreWrite" type="number" min="0" max="4" value="1" />
-            <p class="muted">Produire un texte structuré.</p>
-          </div>
-
-          <div class="diag-block">
-            <h3>🎧 Oral (0–4)</h3>
-            <input id="scoreListen" type="number" min="0" max="4" value="0" />
-            <p class="muted">Comprendre + répondre à l’oral.</p>
-          </div>
-        </div>
-
-        <div class="row">
-          <button class="btn primary" id="runDiag">Calculer mon niveau</button>
-          <button class="btn" id="resetDiag">Réinitialiser</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Conseil</h3>
+        <h1>Diagnostic (rapide)</h1>
         <p class="muted">
-          Si tu comprends l’économie mais pas le vocabulaire “difficile”, ton besoin principal est :
-          <b>lexique + reformulation + connecteurs + grammaire utile</b>.
+          Réponds honnêtement. Le but: t’aider à créer un plan vers C1 (Institut Français).
         </p>
+
+        <div class="grid-2">
+          <div class="card inner">
+            <h2>Compréhension écrite (5)</h2>
+            <div class="q" data-skill="reading" data-answer="b">
+              <p><strong>1)</strong> “Cependant” est un connecteur de…</p>
+              <label><input type="radio" name="r1" value="a"> Addition</label>
+              <label><input type="radio" name="r1" value="b"> Opposition</label>
+              <label><input type="radio" name="r1" value="c"> Cause</label>
+            </div>
+
+            <div class="q" data-skill="reading" data-answer="c">
+              <p><strong>2)</strong> “Il a beau travailler…” signifie :</p>
+              <label><input type="radio" name="r2" value="a"> Il travaille beaucoup et il réussit</label>
+              <label><input type="radio" name="r2" value="b"> Il ne travaille pas</label>
+              <label><input type="radio" name="r2" value="c"> Malgré ses efforts, le résultat n’est pas garanti</label>
+            </div>
+
+            <div class="q" data-skill="reading" data-answer="a">
+              <p><strong>3)</strong> “En revanche” introduit plutôt :</p>
+              <label><input type="radio" name="r3" value="a"> Un contraste</label>
+              <label><input type="radio" name="r3" value="b"> Une conclusion</label>
+              <label><input type="radio" name="r3" value="c"> Une définition</label>
+            </div>
+
+            <div class="q" data-skill="reading" data-answer="b">
+              <p><strong>4)</strong> “Mettre en œuvre” veut dire :</p>
+              <label><input type="radio" name="r4" value="a"> Abandonner</label>
+              <label><input type="radio" name="r4" value="b"> Appliquer / réaliser</label>
+              <label><input type="radio" name="r4" value="c"> Résumer</label>
+            </div>
+
+            <div class="q" data-skill="reading" data-answer="c">
+              <p><strong>5)</strong> “Ce dont j’ai besoin” → “dont” remplace :</p>
+              <label><input type="radio" name="r5" value="a"> ce que</label>
+              <label><input type="radio" name="r5" value="b"> où</label>
+              <label><input type="radio" name="r5" value="c"> de quoi</label>
+            </div>
+          </div>
+
+          <div class="card inner">
+            <h2>Grammaire (5)</h2>
+
+            <div class="q" data-skill="grammar" data-answer="a">
+              <p><strong>1)</strong> Il faut que tu ___ plus souvent.</p>
+              <label><input type="radio" name="g1" value="a"> viennes</label>
+              <label><input type="radio" name="g1" value="b"> viens</label>
+              <label><input type="radio" name="g1" value="c"> viendras</label>
+            </div>
+
+            <div class="q" data-skill="grammar" data-answer="b">
+              <p><strong>2)</strong> Si j’___ le temps, je viendrais.</p>
+              <label><input type="radio" name="g2" value="a"> ai</label>
+              <label><input type="radio" name="g2" value="b"> avais</label>
+              <label><input type="radio" name="g2" value="c"> aurai</label>
+            </div>
+
+            <div class="q" data-skill="grammar" data-answer="c">
+              <p><strong>3)</strong> C’est la femme ___ je t’ai parlé.</p>
+              <label><input type="radio" name="g3" value="a"> que</label>
+              <label><input type="radio" name="g3" value="b"> qui</label>
+              <label><input type="radio" name="g3" value="c"> dont</label>
+            </div>
+
+            <div class="q" data-skill="grammar" data-answer="a">
+              <p><strong>4)</strong> Les décisions qu’il a ___ sont discutables.</p>
+              <label><input type="radio" name="g4" value="a"> prises</label>
+              <label><input type="radio" name="g4" value="b"> pris</label>
+              <label><input type="radio" name="g4" value="c"> prendre</label>
+            </div>
+
+            <div class="q" data-skill="grammar" data-answer="b">
+              <p><strong>5)</strong> Je doute qu’il ___ prêt.</p>
+              <label><input type="radio" name="g5" value="a"> est</label>
+              <label><input type="radio" name="g5" value="b"> soit</label>
+              <label><input type="radio" name="g5" value="c"> sera</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top:14px">
+          <div class="card inner">
+            <h2>Auto-évaluation (4)</h2>
+            <label class="field">
+              Expression écrite (0 → 4)
+              <input id="self-writing" type="range" min="0" max="4" value="1" />
+              <span class="muted">Score: <strong id="self-writing-val">1</strong>/4</span>
+            </label>
+            <label class="field">
+              Expression orale (0 → 4)
+              <input id="self-speaking" type="range" min="0" max="4" value="0" />
+              <span class="muted">Score: <strong id="self-speaking-val">0</strong>/4</span>
+            </label>
+            <p class="muted">
+              Tu m’as dit que l’oral et l’écrit te bloquent surtout par manque de vocabulaire + règles.
+              On va donc prioriser: connecteurs, reformulation, structure, accords, pronoms, subjonctif.
+            </p>
+          </div>
+
+          <div class="card inner">
+            <h2>Ton profil (optionnel)</h2>
+            <label class="field">
+              Thèmes que tu comprends déjà (ex: économie)
+              <input id="profile-themes" type="text" placeholder="ex: économie, audit, finance..." />
+            </label>
+            <label class="field">
+              Mots difficiles: plutôt…
+              <select id="profile-hard">
+                <option value="general">Vocabulaire général</option>
+                <option value="academic">Vocabulaire académique</option>
+                <option value="both" selected>Les deux</option>
+              </select>
+            </label>
+            <button class="btn primary" id="btn-score">Voir mes résultats</button>
+            <p class="muted" id="diag-note" style="margin-top:10px"></p>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- RESULTS -->
-    <section class="screen" id="screen-results">
+    <section class="page" id="page-results">
       <div class="card">
-        <h2>Résultats & niveau estimé</h2>
-        <div class="pill-row">
-          <div class="pill">
-            <div class="pillLabel">Niveau estimé</div>
-            <div class="pillValue" id="levelEstimated">—</div>
-          </div>
-          <div class="pill">
-            <div class="pillLabel">Détails</div>
-            <div class="pillValue" id="scoreDetails">—</div>
-          </div>
-        </div>
-
-        <div class="grid2">
-          <div class="card soft">
-            <h3>Forces</h3>
-            <ul id="strengths"></ul>
+        <h1>Résultats & niveau estimé</h1>
+        <div class="result-card">
+          <div class="result-head">
+            <div class="result-level">
+              <div class="muted">Niveau estimé :</div>
+              <div class="big" id="res-level">—</div>
+            </div>
+            <div class="result-scores muted" id="res-scores">—</div>
           </div>
 
-          <div class="card soft">
-            <h3>Priorités (C1)</h3>
-            <ul id="priorities"></ul>
+          <div class="grid-2">
+            <div class="card inner">
+              <h2>Forces</h2>
+              <ul class="list" id="res-strengths"></ul>
+            </div>
+            <div class="card inner">
+              <h2>Priorités (C1)</h2>
+              <ul class="list" id="res-priorities"></ul>
+            </div>
           </div>
-        </div>
 
-        <div class="row">
-          <button class="btn primary" id="genPlanBtn">Générer mon plan 6 mois</button>
-          <button class="btn" id="goDailyFromRes">Voir “Coach du jour”</button>
+          <div class="row" style="margin-top:14px">
+            <button class="btn primary" id="btn-generate-plan">Générer mon plan 6 mois</button>
+            <button class="btn" id="btn-go-coach">Voir “Coach du jour”</button>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- PLAN -->
-    <section class="screen" id="screen-plan">
+    <section class="page" id="page-plan">
       <div class="card">
-        <h2>Plan 6 mois</h2>
+        <h1>Plan 6 mois</h1>
         <p class="muted">
-          Généré selon ton niveau + ton temps disponible. Tu peux régénérer après un nouveau diagnostic.
+          Plan basé sur ton diagnostic + ton temps (min 30 min/jour, week-end 2h).
         </p>
-        <div id="planBox" class="plan"></div>
 
-        <div class="row">
-          <button class="btn primary" id="regenPlan">Regénérer</button>
-          <button class="btn" id="exportBtn">Exporter mes données</button>
-          <label class="btn fileBtn">
-            Importer <input type="file" id="importFile" accept="application/json" hidden />
-          </label>
+        <div class="grid-2">
+          <div class="card inner">
+            <h2>Réglages utilisés</h2>
+            <div class="kv">
+              <div><span class="k">Date cible</span> <span class="v" id="plan-target">—</span></div>
+              <div><span class="k">Temps/jour</span> <span class="v" id="plan-daily">—</span></div>
+              <div><span class="k">Week-end</span> <span class="v" id="plan-weekend">—</span></div>
+            </div>
+            <button class="btn" id="btn-rebuild">Re-générer</button>
+          </div>
+
+          <div class="card inner">
+            <h2>Structure hebdomadaire</h2>
+            <ul class="list" id="plan-structure"></ul>
+          </div>
+        </div>
+
+        <div class="card inner" style="margin-top:14px">
+          <h2>30 prochains jours (exemple)</h2>
+          <div class="plan-days" id="plan-days"></div>
         </div>
       </div>
     </section>
 
-    <!-- DAILY -->
-    <section class="screen" id="screen-daily">
+    <!-- COACH -->
+    <section class="page" id="page-coach">
       <div class="card">
-        <div class="daily-head">
-          <h2>Coach du jour</h2>
-          <div class="badge" id="dailyBadge">—</div>
-        </div>
+        <h1>Coach du jour</h1>
+        <p class="muted">Une séance prête à faire maintenant (adaptée à ton profil).</p>
 
-        <div class="grid2">
-          <div class="card soft">
-            <h3>⏱ Durée</h3>
-            <p class="big" id="dailyDuration">—</p>
-            <p class="muted" id="dailyHint">—</p>
+        <div class="card inner">
+          <div class="row space-between">
+            <div>
+              <div class="muted">Séance du</div>
+              <div class="big" id="coach-date">—</div>
+            </div>
+            <button class="btn primary" id="btn-done">✅ Séance faite</button>
           </div>
-          <div class="card soft">
-            <h3>🎯 Focus</h3>
-            <p class="big" id="dailyFocus">—</p>
-            <p class="muted">Basé sur tes priorités + ton niveau.</p>
-          </div>
-        </div>
 
-        <div class="card soft">
-          <h3>✅ Ta séance</h3>
-          <ol id="dailyTasks"></ol>
-          <div class="row">
-            <button class="btn primary" id="markDone">J’ai terminé</button>
-            <button class="btn" id="newDaily">Re-générer aujourd’hui</button>
-          </div>
-          <p class="muted" id="doneMsg"></p>
-        </div>
+          <div class="coach-box" id="coach-session"></div>
 
-        <div class="card">
-          <h3>🔗 Tes ressources</h3>
-          <div id="linksBox" class="links"></div>
-          <p class="muted">Tu peux modifier tes liens dans Réglages.</p>
+          <div class="muted" style="margin-top:10px">
+            Streak actuel: <strong id="coach-streak">0</strong> jour(s)
+          </div>
         </div>
       </div>
     </section>
 
     <!-- SETTINGS -->
-    <section class="screen" id="screen-settings">
+    <section class="page" id="page-settings">
       <div class="card">
-        <h2>Réglages</h2>
+        <h1>Réglages</h1>
 
-        <div class="grid2">
-          <div class="card soft">
-            <h3>Objectif</h3>
+        <div class="grid-2">
+          <div class="card inner">
+            <h2>Objectif</h2>
 
-            <label class="label">Date cible (approx.)</label>
-            <input type="date" id="targetDate" />
+            <label class="field">
+              Date cible (approx.)
+              <input type="date" id="set-target" />
+            </label>
 
-            <label class="label">Temps moyen / jour</label>
-            <select id="dailyTime">
-              <option value="30">30 min</option>
-              <option value="45">45 min</option>
-              <option value="60">60 min</option>
-            </select>
+            <label class="field">
+              Temps moyen / jour
+              <select id="set-daily">
+                <option value="30">30 min</option>
+                <option value="45">45 min</option>
+                <option value="60">1 h</option>
+              </select>
+            </label>
 
-            <p class="muted">
-              Week-end : on applique automatiquement une version “2h”.
-            </p>
+            <label class="field">
+              Week-end (par jour)
+              <select id="set-weekend">
+                <option value="120">2 h</option>
+                <option value="180">3 h</option>
+              </select>
+            </label>
           </div>
 
-          <div class="card soft">
-            <h3>Ressources (liens)</h3>
-
-            <label class="label">Lien 1</label>
-            <input id="link1" placeholder="ex: https://..." />
-
-            <label class="label">Lien 2</label>
-            <input id="link2" placeholder="ex: https://..." />
-
-            <label class="label">Lien 3</label>
-            <input id="link3" placeholder="ex: https://..." />
+          <div class="card inner">
+            <h2>Ressources (liens)</h2>
+            <p class="muted">Tu peux mettre tes liens préférés (TV5Monde / RFI / Institut Français).</p>
+            <label class="field">
+              Lien 1
+              <input id="link1" type="url" placeholder="ex: https://..." />
+            </label>
+            <label class="field">
+              Lien 2
+              <input id="link2" type="url" placeholder="ex: https://..." />
+            </label>
+            <label class="field">
+              Lien 3
+              <input id="link3" type="url" placeholder="ex: https://..." />
+            </label>
           </div>
         </div>
 
-        <div class="row">
-          <button class="btn primary" id="saveSettings">Enregistrer</button>
-          <button class="btn danger" id="hardReset">Tout réinitialiser</button>
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary" id="btn-save">Enregistrer</button>
+          <button class="btn" id="btn-export">Exporter mes données</button>
+          <label class="btn ghost" for="importFile" style="cursor:pointer;">Importer</label>
+          <input id="importFile" type="file" accept="application/json" hidden />
         </div>
 
-        <p class="muted">
+        <p class="muted" style="margin-top:10px">
           Export/Import te permet de garder tes données si tu changes de téléphone/PC.
         </p>
       </div>
@@ -255,6 +369,6 @@
     My C1 Coach • Perso • Offline-friendly (LocalStorage)
   </footer>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
