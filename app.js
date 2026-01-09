@@ -1,546 +1,574 @@
-// ===============================
-// My C1 Coach - app.js (FULL)
+// =======================
+// My C1 Coach - app.js
 // Offline-friendly (LocalStorage)
-// ===============================
+// =======================
 
 const STORAGE_KEY = "my_c1_coach_v1";
 
 const DEFAULT_STATE = {
   settings: {
-    targetDate: "",
-    dailyTime: 30,
-    links: {
-      link1: "https://apprendre.tv5monde.com/fr",
-      link2: "https://francaisfacile.rfi.fr/fr/",
-      link3: "https://www.institutfrancais.com/fr"
-    }
+    targetDate: "",     // yyyy-mm-dd
+    dailyTime: 30,      // minutes
+    weekendTime: 120,   // minutes per day
+    links: { link1: "", link2: "", link3: "" }
+  },
+  profile: {
+    themes: "",
+    hard: "both"
   },
   diagnostic: {
-    read: null,
-    gram: null,
-    write: null,
-    listen: null,
-    level: null,
-    details: null,
+    reading: { score: 0, total: 5 },
+    grammar: { score: 0, total: 5 },
+    writingSelf: 1,   // /4
+    speakingSelf: 0,  // /4
+    estimatedLevel: "",
+    priorities: [],
     strengths: [],
-    priorities: []
+    lastRunAt: ""
   },
   plan: {
-    generatedAt: null,
-    weeks: []
-  },
-  daily: {
-    dateKey: null,
-    focus: null,
-    duration: null,
-    tasks: [],
-    done: false
+    generatedAt: "",
+    structure: [],
+    days: []
   },
   streak: {
-    lastDoneDateKey: null,
-    count: 0
+    count: 0,
+    lastDoneDate: "" // yyyy-mm-dd
   }
 };
 
-function loadState(){
-  try{
+function loadState() {
+  try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return structuredClone(DEFAULT_STATE);
-    const st = JSON.parse(raw);
-    // merge shallow defaults
-    return {
-      ...structuredClone(DEFAULT_STATE),
-      ...st,
-      settings: { ...structuredClone(DEFAULT_STATE.settings), ...(st.settings||{}),
-        links: { ...structuredClone(DEFAULT_STATE.settings.links), ...((st.settings||{}).links||{}) }
-      }
-    };
-  }catch(e){
+    if (!raw) return structuredClone(DEFAULT_STATE);
+    const parsed = JSON.parse(raw);
+    return deepMerge(structuredClone(DEFAULT_STATE), parsed);
+  } catch (e) {
     return structuredClone(DEFAULT_STATE);
   }
 }
 
-function saveState(state){
+function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function dateKeyToday(){
+function deepMerge(target, src) {
+  for (const k in src) {
+    if (src[k] && typeof src[k] === "object" && !Array.isArray(src[k])) {
+      if (!target[k] || typeof target[k] !== "object") target[k] = {};
+      deepMerge(target[k], src[k]);
+    } else {
+      target[k] = src[k];
+    }
+  }
+  return target;
+}
+
+function $(sel) { return document.querySelector(sel); }
+function $all(sel) { return Array.from(document.querySelectorAll(sel)); }
+
+function formatMin(min) {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+function todayISO() {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-function isWeekend(){
-  const n = new Date().getDay(); // 0 Sun, 6 Sat
-  return (n === 0 || n === 6);
+function addDaysISO(startISO, days) {
+  const d = new Date(startISO + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-function clampNum(v, min, max, fallback){
-  const n = Number(v);
-  if(Number.isNaN(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
+let state = loadState();
+
+// -----------------------
+// Routing (tabs)
+// -----------------------
+function setRoute(route) {
+  $all(".tab").forEach(b => b.classList.toggle("active", b.dataset.route === route));
+  $all(".page").forEach(p => p.classList.remove("active"));
+  const page = document.getElementById(`page-${route}`);
+  if (page) page.classList.add("active");
+  // update views when switching
+  if (route === "home") renderHome();
+  if (route === "results") renderResults();
+  if (route === "plan") renderPlan();
+  if (route === "coach") renderCoach();
+  if (route === "settings") renderSettings();
 }
 
-// ---------------- UI Helpers ----------------
-function qs(sel){ return document.querySelector(sel); }
-function qsa(sel){ return [...document.querySelectorAll(sel)]; }
-
-function showScreen(name){
-  qsa(".screen").forEach(s => s.classList.remove("show"));
-  qsa(".tab").forEach(t => t.classList.remove("active"));
-
-  qs(`#screen-${name}`)?.classList.add("show");
-  qs(`.tab[data-screen="${name}"]`)?.classList.add("active");
+function bindTabs() {
+  $all(".tab").forEach(btn => {
+    btn.addEventListener("click", () => setRoute(btn.dataset.route));
+  });
 }
 
-function renderHome(state){
-  qs("#homeLevel").textContent = state.diagnostic.level || "—";
-  qs("#homeStreak").textContent = String(state.streak.count || 0);
-  qs("#homeTime").textContent = `${state.settings.dailyTime || 30} min`;
+// -----------------------
+// Diagnostic scoring
+// -----------------------
+function computeDiagnostic() {
+  // reading + grammar radio answers
+  const questions = $all(".q");
+  let readingCorrect = 0, readingTotal = 0;
+  let grammarCorrect = 0, grammarTotal = 0;
+
+  for (const q of questions) {
+    const skill = q.dataset.skill;
+    const answer = q.dataset.answer;
+    const input = q.querySelector("input[type=radio]:checked");
+    const ok = input && input.value === answer;
+
+    if (skill === "reading") {
+      readingTotal++;
+      if (ok) readingCorrect++;
+    } else if (skill === "grammar") {
+      grammarTotal++;
+      if (ok) grammarCorrect++;
+    }
+  }
+
+  const writingSelf = Number($("#self-writing").value || 0);
+  const speakingSelf = Number($("#self-speaking").value || 0);
+
+  // Total points: reading(5) + grammar(5) + writing(4) + speaking(4) = 18
+  const total = readingTotal + grammarTotal + 8;
+  const points = readingCorrect + grammarCorrect + writingSelf + speakingSelf;
+
+  const pct = Math.round((points / total) * 100);
+
+  // simple mapping
+  let level = "A2";
+  if (pct >= 35) level = "B1";
+  if (pct >= 50) level = "B1+";
+  if (pct >= 62) level = "B2";
+  if (pct >= 74) level = "B2+";
+  if (pct >= 85) level = "C1";
+
+  // Priorities based on weakest skills
+  const skills = [
+    { key: "Compréhension écrite", val: readingCorrect / Math.max(1, readingTotal) },
+    { key: "Grammaire", val: grammarCorrect / Math.max(1, grammarTotal) },
+    { key: "Expression écrite", val: writingSelf / 4 },
+    { key: "Expression orale", val: speakingSelf / 4 }
+  ];
+  skills.sort((a, b) => a.val - b.val);
+
+  const priorities = [];
+  const strengths = [];
+
+  // your profile: you told me oral/writing blocked by vocab + rules
+  // We'll always include C1 priorities focused on that.
+  const priorityTemplates = {
+    "Compréhension écrite": "Compréhension écrite : connecteurs, implicite, reformulation.",
+    "Grammaire": "Grammaire/lexique : subjonctif, accords, pronoms, registre soutenu.",
+    "Expression écrite": "Production écrite : structure + connecteurs + précision lexicale (180–220 mots).",
+    "Expression orale": "Production orale : plan, transitions, exemples, reformulation."
+  };
+
+  priorities.push(priorityTemplates[skills[0].key]);
+  priorities.push(priorityTemplates[skills[1].key]);
+
+  strengths.push("Base présente : on va structurer la progression vers B2+/C1.");
+  if (skills[3].val >= 0.6) strengths.push(`Plutôt à l’aise en ${skills[3].key.toLowerCase()}.`);
+
+  state.diagnostic = {
+    reading: { score: readingCorrect, total: readingTotal },
+    grammar: { score: grammarCorrect, total: grammarTotal },
+    writingSelf,
+    speakingSelf,
+    estimatedLevel: level,
+    priorities,
+    strengths,
+    lastRunAt: new Date().toISOString()
+  };
+
+  // keep profile
+  state.profile.themes = $("#profile-themes").value.trim();
+  state.profile.hard = $("#profile-hard").value;
+
+  saveState();
+  return { points, total, pct, level, readingCorrect, readingTotal, grammarCorrect, grammarTotal, writingSelf, speakingSelf };
 }
 
-function renderLinks(state){
-  const box = qs("#linksBox");
-  if(!box) return;
-  box.innerHTML = "";
+// -----------------------
+// Plan generator
+// -----------------------
+function generatePlan30Days() {
+  const { dailyTime, weekendTime } = state.settings;
+  const lvl = state.diagnostic.estimatedLevel || "—";
+  const priorities = state.diagnostic.priorities.length
+    ? state.diagnostic.priorities
+    : [
+        "Compréhension écrite : connecteurs, implicite, reformulation.",
+        "Grammaire/lexique : subjonctif, accords, pronoms, registre soutenu."
+      ];
 
-  const links = state.settings.links || {};
-  const items = [
-    ["TV5Monde", links.link1],
-    ["RFI", links.link2],
-    ["Institut Français", links.link3]
+  const structure = [
+    `Lun–Ven (${formatMin(dailyTime)}) : 1 bloc grammaire + 1 bloc vocab + 1 mini production (écrit/oral).`,
+    `Week-end (${formatMin(weekendTime)}) : compréhension (audio/texte) + production longue + correction + reformulation.`,
+    `Chaque jour : 10 min de révision (Anki / listes) + 1 connecteur + 2 reformulations.`
   ];
 
-  items.forEach(([label,url], idx)=>{
-    if(!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = label;
-    box.appendChild(a);
-  });
+  // Build 30 days
+  const start = todayISO();
+  const days = [];
+
+  for (let i = 0; i < 30; i++) {
+    const date = addDaysISO(start, i);
+    const dayOfWeek = new Date(date + "T00:00:00").getDay(); // 0=Sun
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+    const minutes = isWeekend ? weekendTime : dailyTime;
+
+    const focus = pickDailyFocus(i);
+    const tasks = buildTasks(focus, minutes, priorities);
+
+    days.push({
+      date,
+      minutes,
+      focus,
+      tasks
+    });
+  }
+
+  state.plan = {
+    generatedAt: new Date().toISOString(),
+    structure,
+    days
+  };
+  saveState();
 }
 
-function renderResults(state){
+function pickDailyFocus(i) {
+  const cycle = ["Grammaire", "Vocabulaire", "Écrit", "Oral", "Lecture", "Écoute"];
+  return cycle[i % cycle.length];
+}
+
+function buildTasks(focus, minutes, priorities) {
+  const links = Object.values(state.settings.links).filter(Boolean);
+  const linkLine = links.length ? `Ressource: ${links[0]}` : "Ressource: (ajoute tes liens dans Réglages)";
+
+  // Your situation: economics comprehension ok, but vocab/rules block oral & writing.
+  const base = [
+    `✅ 10 min : révision vocab (liste/Anki) + 5 mots + 2 phrases.`,
+    `✅ 10 min : grammaire (accords / pronoms / subjonctif) + 5 exemples.`,
+    `✅ 10 min : reformulation (2 phrases → 2 reformulations chacune).`,
+  ];
+
+  const add = [];
+  if (focus === "Grammaire") {
+    add.push("📌 Grammaire : subjonctif (que/quoi/dont), accords du participe, pronoms.");
+    add.push("✍️ Mini production : 6 phrases avec connecteurs (cependant, en revanche, donc…).");
+  } else if (focus === "Vocabulaire") {
+    add.push("📌 Lexique : mots académiques (cause/conséquence, nuance, concession).");
+    add.push("🗣️ Oral : 2 minutes — résumer un sujet d’économie en langage simple.");
+  } else if (focus === "Écrit") {
+    add.push("✍️ Production écrite : 120–180 mots (opinion + 2 arguments + exemple).");
+    add.push("🔍 Correction : vérifier accords + connecteurs + précision lexicale.");
+  } else if (focus === "Oral") {
+    add.push("🗣️ Production orale : plan 3 parties + transitions (d’abord/ensuite/enfin).");
+    add.push("🎙️ Reformulation : répéter la même idée en 3 façons différentes.");
+  } else if (focus === "Lecture") {
+    add.push("📖 Lecture : 1 article court → surligner connecteurs + implicite.");
+    add.push("🧠 Reformulation : 5 phrases du texte en tes mots.");
+  } else if (focus === "Écoute") {
+    add.push("🎧 Écoute : 5–10 min → noter 8 mots nouveaux.");
+    add.push("🗣️ Résumé oral : 60–90 sec + 2 reformulations.");
+  }
+
+  // adjust if more time
+  const extra = [];
+  if (minutes >= 45) extra.push("➕ Bonus 10 min : 1 exercice de grammaire + correction.");
+  if (minutes >= 120) extra.push("➕ Bonus week-end : rédaction 200 mots + auto-correction (accords/connecteurs).");
+
+  const pri = priorities.slice(0, 2).map(p => `🎯 ${p}`);
+
+  return [...pri, ...base, ...add, ...extra, linkLine];
+}
+
+// -----------------------
+// Coach of the day + streak
+// -----------------------
+function renderCoach() {
+  $("#coach-date").textContent = new Date().toLocaleDateString("fr-FR", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  $("#coach-streak").textContent = String(state.streak.count);
+
+  const dayIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
+  const focus = pickDailyFocus(dayIndex);
+
+  const minutes = isWeekendToday() ? state.settings.weekendTime : state.settings.dailyTime;
+  const priorities = state.diagnostic.priorities.length ? state.diagnostic.priorities : [
+    "Compréhension écrite : connecteurs, implicite, reformulation.",
+    "Grammaire/lexique : subjonctif, accords, pronoms, registre soutenu."
+  ];
+
+  const tasks = buildTasks(focus, minutes, priorities);
+
+  $("#coach-session").innerHTML = `
+    <h3>Séance (${formatMin(minutes)}) — Focus: ${focus}</h3>
+    <ul>${tasks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
+  `;
+}
+
+function isWeekendToday() {
+  const d = new Date();
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+function markDoneToday() {
+  const t = todayISO();
+  if (state.streak.lastDoneDate === t) return; // already done today
+
+  // if consecutive day, increment; else reset to 1
+  if (state.streak.lastDoneDate) {
+    const prev = state.streak.lastDoneDate;
+    const prevDate = new Date(prev + "T00:00:00");
+    const curDate = new Date(t + "T00:00:00");
+    const diffDays = Math.round((curDate - prevDate) / (1000*60*60*24));
+    state.streak.count = (diffDays === 1) ? state.streak.count + 1 : 1;
+  } else {
+    state.streak.count = 1;
+  }
+
+  state.streak.lastDoneDate = t;
+  saveState();
+}
+
+// -----------------------
+// Rendering
+// -----------------------
+function renderHome() {
+  $("#home-level").textContent = state.diagnostic.estimatedLevel || "—";
+  $("#home-streak").textContent = String(state.streak.count);
+  $("#home-daily").textContent = formatMin(state.settings.dailyTime);
+
+  const target = state.settings.targetDate
+    ? new Date(state.settings.targetDate + "T00:00:00").toLocaleDateString("fr-FR")
+    : "Choisis une date cible dans Réglages (ex: dans 6 mois).";
+
+  $("#home-goal").textContent = `Objectif: C1 • Date cible: ${target}`;
+
+  const pr = state.diagnostic.priorities.length
+    ? state.diagnostic.priorities
+    : [
+        "Compréhension écrite : connecteurs, implicite, reformulation.",
+        "Grammaire/lexique : subjonctif, accords, pronoms, registre soutenu.",
+        "Production écrite : structure + connecteurs + précision lexicale (180–220 mots).",
+        "Production orale : plan, transitions, exemples, reformulation."
+      ];
+
+  $("#home-priorities").innerHTML = pr.slice(0, 4).map(x => `<li>${escapeHtml(x)}</li>`).join("");
+}
+
+function renderResults() {
   const d = state.diagnostic;
+  $("#res-level").textContent = d.estimatedLevel || "—";
 
-  qs("#levelEstimated").textContent = d.level || "—";
-  qs("#scoreDetails").textContent = d.details || "—";
-
-  const sBox = qs("#strengths");
-  const pBox = qs("#priorities");
-  sBox.innerHTML = "";
-  pBox.innerHTML = "";
-
-  (d.strengths || []).forEach(x=>{
-    const li = document.createElement("li");
-    li.textContent = x;
-    sBox.appendChild(li);
-  });
-
-  (d.priorities || []).forEach(x=>{
-    const li = document.createElement("li");
-    li.textContent = x;
-    pBox.appendChild(li);
-  });
-}
-
-function renderPlan(state){
-  const box = qs("#planBox");
-  if(!box) return;
-
-  if(!state.plan.weeks || state.plan.weeks.length === 0){
-    box.innerHTML = `<p class="muted">Aucun plan généré pour l’instant. Va dans Résultats → “Générer mon plan 6 mois”.</p>`;
+  if (!d.lastRunAt) {
+    $("#res-scores").textContent = "Fais d’abord le diagnostic 🙂";
+    $("#res-strengths").innerHTML = `<li>—</li>`;
+    $("#res-priorities").innerHTML = `<li>—</li>`;
     return;
   }
 
-  box.innerHTML = state.plan.weeks.map(w=>`
-    <div class="week">
-      <div class="row" style="justify-content:space-between; align-items:center">
-        <h4>Semaine ${w.week} — ${w.title}</h4>
-        <span class="tag">${w.tag}</span>
-      </div>
-      <ul>${w.tasks.map(t=>`<li>${t}</li>`).join("")}</ul>
+  $("#res-scores").textContent =
+    `Compréhension écrite: ${d.reading.score}/${d.reading.total} • ` +
+    `Grammaire: ${d.grammar.score}/${d.grammar.total} • ` +
+    `Écrit (auto): ${d.writingSelf}/4 • Oral (auto): ${d.speakingSelf}/4`;
+
+  $("#res-strengths").innerHTML = d.strengths.map(x => `<li>${escapeHtml(x)}</li>`).join("");
+  $("#res-priorities").innerHTML = d.priorities.map(x => `<li>${escapeHtml(x)}</li>`).join("");
+}
+
+function renderPlan() {
+  if (!state.plan.days.length) {
+    $("#plan-target").textContent = state.settings.targetDate || "—";
+    $("#plan-daily").textContent = formatMin(state.settings.dailyTime);
+    $("#plan-weekend").textContent = formatMin(state.settings.weekendTime);
+    $("#plan-structure").innerHTML = `<li>Génère ton plan depuis “Résultats”</li>`;
+    $("#plan-days").innerHTML = "";
+    return;
+  }
+
+  $("#plan-target").textContent = state.settings.targetDate || "—";
+  $("#plan-daily").textContent = formatMin(state.settings.dailyTime);
+  $("#plan-weekend").textContent = formatMin(state.settings.weekendTime);
+
+  $("#plan-structure").innerHTML = state.plan.structure.map(x => `<li>${escapeHtml(x)}</li>`).join("");
+
+  $("#plan-days").innerHTML = state.plan.days.map((d, idx) => `
+    <div class="day">
+      <div class="dtitle">Jour ${idx + 1} — ${escapeHtml(d.focus)}</div>
+      <div class="dmeta">${escapeHtml(d.date)} • ${escapeHtml(formatMin(d.minutes))}</div>
+      <ul>${d.tasks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
     </div>
   `).join("");
 }
 
-function renderDaily(state){
-  const d = state.daily;
-  qs("#dailyBadge").textContent = d.dateKey ? `📅 ${d.dateKey}` : "—";
-  qs("#dailyDuration").textContent = d.duration ? `${d.duration} min` : "—";
-  qs("#dailyHint").textContent = isWeekend()
-    ? "Week-end : séance longue (≈ 2h)"
-    : "Semaine : séance courte (30–45 min)";
-
-  qs("#dailyFocus").textContent = d.focus || "—";
-
-  const list = qs("#dailyTasks");
-  list.innerHTML = "";
-  (d.tasks || []).forEach(t=>{
-    const li = document.createElement("li");
-    li.textContent = t;
-    list.appendChild(li);
-  });
-
-  qs("#doneMsg").textContent = d.done ? "✅ Séance déjà validée aujourd’hui. Bravo !" : "";
-}
-
-// ---------------- Diagnostic Logic ----------------
-function estimateLevel(read, gram, write, listen){
-  // total / 28
-  const total = read + gram + write + listen;
-  const pct = total / 28;
-
-  if(pct < 0.35) return "A2";
-  if(pct < 0.52) return "B1";
-  if(pct < 0.68) return "B1/B1+";
-  if(pct < 0.80) return "B2";
-  if(pct < 0.90) return "B2+";
-  return "C1 (début)";
-}
-
-function computeStrengthsPriorities(read, gram, write, listen){
-  const strengths = [];
-  const priorities = [];
-
-  // strengths
-  if(read >= 7) strengths.push("Compréhension écrite : base solide.");
-  if(gram >= 7) strengths.push("Grammaire : bon socle.");
-  if(write >= 3) strengths.push("Production écrite : bonne capacité.");
-  if(listen >= 3) strengths.push("Oral : compréhension/réponse déjà bien.");
-
-  if(strengths.length === 0) strengths.push("Base présente : on va structurer la progression vers B2+/C1.");
-
-  // priorities for C1 (based on your described issues)
-  priorities.push("Compréhension orale : vocabulaire difficile + reformulation.");
-  priorities.push("Compréhension écrite : connecteurs, implicite, inférences.");
-  priorities.push("Grammaire/lexique : subjonctif, accords, pronoms, registre soutenu.");
-  priorities.push("Production écrite : structure + connecteurs + précision lexicale (180–220 mots).");
-  priorities.push("Production orale : plan, transitions, exemples, reformulation.");
-
-  // adjust focus if some score very low
-  if(listen <= 1) priorities.unshift("Oral prioritaire : écoute quotidienne + shadowing.");
-  if(write <= 1) priorities.unshift("Écrit prioritaire : 10 minutes/jour de rédaction + correction.");
-
-  return { strengths, priorities };
-}
-
-// ---------------- Plan 6 months ----------------
-function buildPlan(state){
-  const lvl = state.diagnostic.level || "B1";
-  const dailyTime = Number(state.settings.dailyTime || 30);
-
-  // Define intensity
-  const intensity = dailyTime >= 60 ? "Intensif" : (dailyTime >= 45 ? "Soutenu" : "Standard");
-
-  // 24 weeks (6 months)
-  const weeks = [];
-  for(let i=1;i<=24;i++){
-    let tag = "B1 → B2";
-    if(lvl.includes("B2") || lvl.includes("C1")) tag = "B2 → C1";
-    if(i >= 13) tag = "Objectif C1";
-
-    const title = (i<=4) ? "Fondations (lexique + grammaire utile)"
-      : (i<=12) ? "Consolidation B2 (compréhension + production)"
-      : (i<=20) ? "Montée C1 (reformulation + nuance + registre)"
-      : "Simulation examens (C1)";
-
-    const tasks = [
-      `📖 Lecture (TV5/RFI) + surligner connecteurs (15–20 min)`,
-      `🧠 Grammaire ciblée (subjonctif / pronoms / accords) (10–15 min)`,
-      `🎧 Écoute + reformulation (5–15 min)`,
-      `✍️ Mini écrit (80–220 mots selon semaine)`,
-      `🗣 Oral : 2 minutes → 5 minutes (progressif)`
-    ];
-
-    // tweak by phase
-    if(i>=13) tasks[3] = "✍️ Écrit : 180–220 mots + plan + connecteurs + conclusion";
-    if(i>=21) tasks.splice(0,0,"📝 1 sujet type C1 (production écrite) + auto-correction");
-
-    weeks.push({ week:i, title, tag: `${tag} • ${intensity}`, tasks });
+function renderSettings() {
+  // defaults
+  if (!state.settings.targetDate) {
+    // set default target date ~6 months
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() + 6, now.getDate());
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    state.settings.targetDate = `${yyyy}-${mm}-${dd}`;
+    saveState();
   }
 
-  state.plan.generatedAt = new Date().toISOString();
-  state.plan.weeks = weeks;
-  saveState(state);
+  $("#set-target").value = state.settings.targetDate;
+  $("#set-daily").value = String(state.settings.dailyTime);
+  $("#set-weekend").value = String(state.settings.weekendTime);
+
+  $("#link1").value = state.settings.links.link1 || "";
+  $("#link2").value = state.settings.links.link2 || "";
+  $("#link3").value = state.settings.links.link3 || "";
 }
 
-// ---------------- Daily Coach ----------------
-function dailyFocusFromState(state){
-  // Use priorities + known difficulty (oral + grammar + vocab)
-  const p = state.diagnostic.priorities || [];
-  if(p.length) return p[0].replace("prioritaire : ","");
-  // fallback
-  return "Lexique + reformulation + connecteurs";
-}
-
-function buildDailyTasks(state){
-  const minutesWeek = Number(state.settings.dailyTime || 30);
-  const minutes = isWeekend() ? 120 : minutesWeek;
-
-  const lvl = state.diagnostic.level || "B1";
-  const focus = dailyFocusFromState(state);
-
-  const tasks = [];
-
-  if(minutes <= 30){
-    tasks.push("🎧 7 min écoute (RFI/TV5) + noter 6 mots");
-    tasks.push("🗣 5 min shadowing (répéter à voix haute)");
-    tasks.push("📖 1 petit article + 5 connecteurs à repérer");
-    tasks.push("✍️ 5 phrases (avec 2 connecteurs) sur ton sujet d’études");
-  } else if(minutes <= 45){
-    tasks.push("🎧 10 min écoute + reformuler 5 phrases");
-    tasks.push("📖 1 article (TV5/RFI) + résumer en 8 phrases");
-    tasks.push("🧠 1 règle (subjonctif/accords/pronoms) + 6 exemples");
-    tasks.push("🗣 5 min : expliquer un sujet d’économie avec plan (intro→2 idées→conclusion)");
-  } else if(minutes <= 60){
-    tasks.push("🎧 12 min écoute + reformulation (10 phrases)");
-    tasks.push("📖 1 article long + 10 connecteurs + vocabulaire");
-    tasks.push("🧠 Grammaire : 2 micro-leçons + exercices");
-    tasks.push("✍️ 120–160 mots : opinion nuancée + connecteurs");
-    tasks.push("🗣 6–8 min : parler + transitions + exemple");
-  } else {
-    tasks.push("🎧 20 min écoute (2 sources) + résumé oral 2 min");
-    tasks.push("📖 2 articles + tableau vocabulaire (20 mots)");
-    tasks.push("🧠 Grammaire C1 : subjonctif + pronoms + accords complexes");
-    tasks.push("✍️ 180–220 mots : plan + connecteurs + registre soutenu");
-    tasks.push("🗣 10 min : exposé (intro→2 arguments→contre-argument→conclusion)");
-  }
-
-  // small personalization message
-  tasks.unshift(`🎯 Focus du jour : ${focus}`);
-  tasks.unshift(`📌 Niveau actuel : ${lvl}`);
-
-  state.daily = {
-    dateKey: dateKeyToday(),
-    focus,
-    duration: minutes,
-    tasks,
-    done: false
-  };
-  saveState(state);
-}
-
-function ensureDaily(state){
-  const today = dateKeyToday();
-  if(!state.daily.dateKey || state.daily.dateKey !== today){
-    buildDailyTasks(state);
-  }
-}
-
-// ---------------- Streak ----------------
-function markDoneToday(state){
-  const today = dateKeyToday();
-  if(state.daily.dateKey !== today) ensureDaily(state);
-
-  if(!state.daily.done){
-    state.daily.done = true;
-
-    // streak logic
-    if(state.streak.lastDoneDateKey !== today){
-      // if yesterday done -> increment, else reset to 1
-      const last = state.streak.lastDoneDateKey;
-      const y = new Date();
-      y.setDate(y.getDate()-1);
-      const yKey = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,"0")}-${String(y.getDate()).padStart(2,"0")}`;
-
-      if(last === yKey){
-        state.streak.count = (state.streak.count || 0) + 1;
-      } else {
-        state.streak.count = 1;
-      }
-      state.streak.lastDoneDateKey = today;
-    }
-
-    saveState(state);
-  }
-}
-
-// ---------------- Export/Import ----------------
-function exportData(){
-  const state = loadState();
-  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+// -----------------------
+// Export/Import
+// -----------------------
+function exportData() {
+  const dataStr = JSON.stringify(state, null, 2);
+  const blob = new Blob([dataStr], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "my-c1-coach-data.json";
+  a.download = `my-c1-coach-${todayISO()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
 }
 
-function importData(file){
+function importData(file) {
   const reader = new FileReader();
   reader.onload = () => {
-    try{
-      const st = JSON.parse(reader.result);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(st));
-      init();
-      alert("✅ Import réussi !");
-    }catch(e){
-      alert("❌ Fichier invalide.");
+    try {
+      const parsed = JSON.parse(reader.result);
+      state = deepMerge(structuredClone(DEFAULT_STATE), parsed);
+      saveState();
+      renderHome();
+      renderResults();
+      renderPlan();
+      renderCoach();
+      renderSettings();
+      alert("Import terminé ✅");
+    } catch (e) {
+      alert("Fichier invalide ❌");
     }
   };
   reader.readAsText(file);
 }
 
-// ---------------- Init & Events ----------------
-function init(){
-  const state = loadState();
-
-  // fill settings inputs
-  qs("#targetDate").value = state.settings.targetDate || "";
-  qs("#dailyTime").value = String(state.settings.dailyTime || 30);
-  qs("#link1").value = state.settings.links.link1 || "";
-  qs("#link2").value = state.settings.links.link2 || "";
-  qs("#link3").value = state.settings.links.link3 || "";
-
-  ensureDaily(state);
-
-  renderHome(state);
-  renderResults(state);
-  renderPlan(state);
-  renderDaily(state);
-  renderLinks(state);
+// -----------------------
+// Helpers
+// -----------------------
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
-function wire(){
-  // Tabs
-  qs("#tabs").addEventListener("click", (e)=>{
-    const btn = e.target.closest(".tab");
-    if(!btn) return;
-    showScreen(btn.dataset.screen);
-    // rerender in case
-    const st = loadState();
-    ensureDaily(st);
-    renderHome(st);
-    renderResults(st);
-    renderPlan(st);
-    renderDaily(st);
-    renderLinks(st);
+// -----------------------
+// Init bindings
+// -----------------------
+function init() {
+  bindTabs();
+
+  // home shortcuts
+  $("#go-diagnostic").addEventListener("click", () => setRoute("diagnostic"));
+  $("#go-coach").addEventListener("click", () => setRoute("coach"));
+
+  // live range values
+  const wr = $("#self-writing");
+  const sp = $("#self-speaking");
+  const wrVal = $("#self-writing-val");
+  const spVal = $("#self-speaking-val");
+
+  function syncRanges() {
+    wrVal.textContent = wr.value;
+    spVal.textContent = sp.value;
+  }
+  wr.addEventListener("input", syncRanges);
+  sp.addEventListener("input", syncRanges);
+  syncRanges();
+
+  // score
+  $("#btn-score").addEventListener("click", () => {
+    const r = computeDiagnostic();
+    $("#diag-note").textContent = `OK ✅ Score global: ${r.points}/${r.total} (${r.pct}%) → niveau estimé ${r.level}.`;
+    setRoute("results");
   });
 
-  // Home buttons
-  qs("#goDiag").addEventListener("click", ()=>showScreen("diag"));
-  qs("#goDaily").addEventListener("click", ()=>showScreen("daily"));
-
-  // Diagnostic actions
-  qs("#runDiag").addEventListener("click", ()=>{
-    const state = loadState();
-    const read = clampNum(qs("#scoreRead").value, 0, 10, 5);
-    const gram = clampNum(qs("#scoreGram").value, 0, 10, 4);
-    const write = clampNum(qs("#scoreWrite").value, 0, 4, 1);
-    const listen = clampNum(qs("#scoreListen").value, 0, 4, 0);
-
-    const lvl = estimateLevel(read, gram, write, listen);
-    const total = read + gram + write + listen;
-
-    const { strengths, priorities } = computeStrengthsPriorities(read, gram, write, listen);
-
-    state.diagnostic = {
-      read, gram, write, listen,
-      level: lvl,
-      details: `Lecture ${read}/10 • Grammaire ${gram}/10 • Écrit ${write}/4 • Oral ${listen}/4 • Total ${total}/28`,
-      strengths,
-      priorities
-    };
-
-    saveState(state);
-    ensureDaily(state);
-    renderResults(state);
-    renderHome(state);
-    renderDaily(state);
-
-    showScreen("results");
+  // generate plan
+  $("#btn-generate-plan").addEventListener("click", () => {
+    generatePlan30Days();
+    setRoute("plan");
   });
 
-  qs("#resetDiag").addEventListener("click", ()=>{
-    qs("#scoreRead").value = 5;
-    qs("#scoreGram").value = 4;
-    qs("#scoreWrite").value = 1;
-    qs("#scoreListen").value = 0;
+  $("#btn-go-coach").addEventListener("click", () => setRoute("coach"));
+  $("#btn-rebuild").addEventListener("click", () => {
+    generatePlan30Days();
+    renderPlan();
+    alert("Plan mis à jour ✅");
   });
 
-  // Results -> Plan
-  qs("#genPlanBtn").addEventListener("click", ()=>{
-    const state = loadState();
-    buildPlan(state);
-    renderPlan(state);
-    showScreen("plan");
+  // coach done
+  $("#btn-done").addEventListener("click", () => {
+    markDoneToday();
+    renderCoach();
+    renderHome();
   });
 
-  qs("#goDailyFromRes").addEventListener("click", ()=>{
-    showScreen("daily");
-    const st = loadState();
-    ensureDaily(st);
-    renderDaily(st);
-    renderLinks(st);
+  // settings save
+  $("#btn-save").addEventListener("click", () => {
+    state.settings.targetDate = $("#set-target").value;
+    state.settings.dailyTime = Number($("#set-daily").value);
+    state.settings.weekendTime = Number($("#set-weekend").value);
+
+    state.settings.links.link1 = $("#link1").value.trim();
+    state.settings.links.link2 = $("#link2").value.trim();
+    state.settings.links.link3 = $("#link3").value.trim();
+
+    saveState();
+    renderHome();
+    alert("Réglages enregistrés ✅");
   });
 
-  // Plan buttons
-  qs("#regenPlan").addEventListener("click", ()=>{
-    const state = loadState();
-    buildPlan(state);
-    renderPlan(state);
-    alert("✅ Plan regénéré !");
-  });
-
-  qs("#exportBtn").addEventListener("click", exportData);
-  qs("#importFile").addEventListener("change", (e)=>{
-    const f = e.target.files?.[0];
-    if(f) importData(f);
+  // export/import
+  $("#btn-export").addEventListener("click", exportData);
+  $("#importFile").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) importData(file);
     e.target.value = "";
   });
 
-  // Daily actions
-  qs("#markDone").addEventListener("click", ()=>{
-    const state = loadState();
-    markDoneToday(state);
-    renderDaily(state);
-    renderHome(state);
-  });
+  // initial render
+  renderHome();
+  renderResults();
+  renderPlan();
+  renderSettings();
+  renderCoach();
 
-  qs("#newDaily").addEventListener("click", ()=>{
-    const state = loadState();
-    buildDailyTasks(state);
-    renderDaily(state);
-    renderLinks(state);
-    alert("✅ Coach du jour regénéré !");
-  });
-
-  // Settings
-  qs("#saveSettings").addEventListener("click", ()=>{
-    const state = loadState();
-    state.settings.targetDate = qs("#targetDate").value || "";
-    state.settings.dailyTime = clampNum(qs("#dailyTime").value, 10, 240, 30);
-    state.settings.links.link1 = qs("#link1").value.trim();
-    state.settings.links.link2 = qs("#link2").value.trim();
-    state.settings.links.link3 = qs("#link3").value.trim();
-
-    saveState(state);
-    ensureDaily(state);
-    renderHome(state);
-    renderDaily(state);
-    renderLinks(state);
-
-    alert("✅ Réglages enregistrés !");
-  });
-
-  qs("#hardReset").addEventListener("click", ()=>{
-    localStorage.removeItem(STORAGE_KEY);
-    init();
-    alert("✅ Tout est réinitialisé.");
-    showScreen("home");
-  });
+  setRoute("home");
 }
 
-// boot
-wire();
 init();
-showScreen("home");
-
